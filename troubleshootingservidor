@@ -1,0 +1,188 @@
+<?php header("Content-type: text/html; charset=utf-8"); ?>
+<meta http-equiv="refresh" content="5">
+
+<?php
+
+$h = "3"; 
+$hm = $h * 60;
+$ms = $hm * 60;
+$gmdata = gmdate("d/m/Y", time()-($ms)); 
+$gmhora = gmdate("G:i", time()-($ms));
+
+echo sprintf("Data: $gmdata <br />  Hora:  $gmhora <br />");
+
+
+
+$loadtime = sys_getloadavg();
+
+function getServerMemoryUsage($getPercentage=true)
+    {
+        $memoryTotal = null;
+        $memoryFree = null;
+
+        if (stristr(PHP_OS, "win")) {
+            $cmd = "wmic ComputerSystem get TotalPhysicalMemory";
+            @exec($cmd, $outputTotalPhysicalMemory);
+
+            $cmd = "wmic OS get FreePhysicalMemory";
+            @exec($cmd, $outputFreePhysicalMemory);
+
+            if ($outputTotalPhysicalMemory && $outputFreePhysicalMemory) {
+                foreach ($outputTotalPhysicalMemory as $line) {
+                    if ($line && preg_match("/^[0-9]+\$/", $line)) {
+                        $memoryTotal = $line;
+                        break;
+                    }
+                }
+
+                foreach ($outputFreePhysicalMemory as $line) {
+                    if ($line && preg_match("/^[0-9]+\$/", $line)) {
+                        $memoryFree = $line;
+                        $memoryFree *= 1024;  
+                        break;
+                    }
+                }
+            }
+        }
+        else
+        {
+            if (is_readable("/proc/meminfo"))
+            {
+                $stats = @file_get_contents("/proc/meminfo");
+
+                if ($stats !== false) {
+                    $stats = str_replace(array("\r\n", "\n\r", "\r"), "\n", $stats);
+                    $stats = explode("\n", $stats);
+
+                    foreach ($stats as $statLine) {
+                        $statLineData = explode(":", trim($statLine));
+
+
+                        if (count($statLineData) == 2 && trim($statLineData[0]) == "MemTotal") {
+                            $memoryTotal = trim($statLineData[1]);
+                            $memoryTotal = explode(" ", $memoryTotal);
+                            $memoryTotal = $memoryTotal[0];
+                            $memoryTotal *= 1024;  
+                        }
+
+                        if (count($statLineData) == 2 && trim($statLineData[0]) == "MemFree") {
+                            $memoryFree = trim($statLineData[1]);
+                            $memoryFree = explode(" ", $memoryFree);
+                            $memoryFree = $memoryFree[0];
+                            $memoryFree *= 1024;  
+                        }
+                    }
+                }
+            }
+        }
+
+        if (is_null($memoryTotal) || is_null($memoryFree)) {
+            return null;
+        } else {
+            if ($getPercentage) {
+                return (100 - ($memoryFree * 100 / $memoryTotal));
+            } else {
+                return array(
+                    "total" => $memoryTotal,
+                    "free" => $memoryFree,
+                );
+            }
+        }
+    }
+
+    function getNiceFileSize($bytes, $binaryPrefix=true) {
+        if ($binaryPrefix) {
+            $unit=array('B','KiB','MiB','GiB','TiB','PiB');
+            if ($bytes==0) return '0 ' . $unit[0];
+            return @round($bytes/pow(1024,($i=floor(log($bytes,1024)))),2) .' '. (isset($unit[$i]) ? $unit[$i] : 'B');
+        } else {
+            $unit=array('B','KB','MB','GB','TB','PB');
+            if ($bytes==0) return '0 ' . $unit[0];
+            return @round($bytes/pow(1000,($i=floor(log($bytes,1000)))),2) .' '. (isset($unit[$i]) ? $unit[$i] : 'B');
+        }
+    }
+
+    $memUsage = getServerMemoryUsage(false);
+    echo sprintf("<br /> Load: $loadtime[0] <br />");
+    echo sprintf(" Memoria em uso: %s / Memoria total:  %s (%s%%) <br />",
+        getNiceFileSize($memUsage["total"] - $memUsage["free"]),
+        getNiceFileSize($memUsage["total"]),
+        getServerMemoryUsage(true)
+    );
+
+
+
+#Procurar uma solução para achar 3 sites do mesmo servidor
+#<iframe src="http://localhost/server-status"></iframe>
+
+
+echo '<br /> Versão do php: ' . phpversion() . '<br />';
+
+
+
+#criar validação para o caminho
+$inipath=php_ini_loaded_file();
+
+if ($inipath == '/etc/php.ini' or $inipath == '/etc/php53.d/php.ini' or $inipath == '/etc/php54.d/php.ini' or $inipath == '/etc/php55.d/php.ini' or $inipath == '/etc/php56.d/php.ini' or $inipath == '/etc/php7.d/php.ini' or $inipath == '/etc/php71.d/php.ini' or $inipath == '/etc/php71.d/php.ini' or $inipath == '/etc/php72.d/php.ini' or $inipath == '/etc/php73.d/php.ini') {
+    echo 'Onde esta o php.ini: ' . $inipath . '  <--- Parece incorreto. Verificar .htaccess e php.ini ';
+} else {
+    echo 'Onde esta o php.ini: ' . $inipath . '  <---  Parece correto';
+}
+
+
+$dir = getcwd();
+$part = explode('/', $dir);
+$cami = "/" . $part[1] . "/" . $part[6] . "/tmp";
+
+
+$sessfile = ini_get('session.save_path');
+
+
+if ($sessfile == $cami) {
+
+echo "<br /> Caminho da Session: " . $sessfile . "  <---  Caminho da session parece correto";
+
+
+} else {
+
+echo "<br /> Caminho da Session: " . $sessfile . "  <---  Caminho da session parece incorreto. Verificar php.ini";
+
+
+}
+
+
+
+echo "<br /><br /> Logs de erro: <br /><br />";
+
+#$linhas = file('/home/storage/e/31/82/abacaxi2/logs/error_log20210115');
+#$linhas = array_slice($linhas, -5);
+
+#print_r(implode(PHP_EOL, $linhas));
+
+$c_log = "/" . $part[1] . "/" . $part[6];
+$data = gmdate("Ymd", time()-($ms));
+
+
+$file = new SplFileObject($c_log . '/logs/error_log' . $data);
+$file->seek(PHP_INT_MAX);
+
+$linesTotal = $file->key();
+$startLine = $linesTotal - 10;
+
+for ($x = $startLine; $x <= $linesTotal; $x++) {
+    $file->seek($x);
+    echo $file->current().'<br>';
+}
+
+echo "<br /> Caminho onde esta executando o arquivo: " . getcwd() . "<br />";
+
+
+
+
+
+
+
+?>
+
+
+
